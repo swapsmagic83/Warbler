@@ -300,6 +300,35 @@ def messages_destroy(message_id):
 
     return redirect(f"/users/{g.user.id}")
 
+@app.route('/users/<int:user_id>/likes')
+def user_likes(user_id):
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    user = User.query.get_or_404(user_id)
+    user_likes = user.likes
+    return render_template('users/likes.html', user=user, likes=user_likes)
+
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def user_add_like(message_id):
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    
+    liked_message = Message.query.get_or_404(message_id)
+    
+    user_likes = g.user.likes
+    
+    if liked_message in user_likes:
+        g.user.likes.remove(liked_message)
+    else:
+        g.user.likes.append(liked_message)
+    
+    db.session.commit()
+    
+    return redirect("/")
+
+
 
 ##############################################################################
 # Homepage and error pages
@@ -314,10 +343,10 @@ def homepage():
     """
 
     if g.user:
-        following_user_ids = [g.user.id]
-        
+        following_user_ids = []
+        following_user_ids.append(g.user.id)
         for following in g.user.following:
-            following_user_ids += following.id
+            following_user_ids.append(following.id)
 
         
         messages = (Message
@@ -326,8 +355,9 @@ def homepage():
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
+        liked_messages = g.user.likes
 
-        return render_template('home.html', messages=messages)
+        return render_template('home.html', messages=messages, liked_messages=liked_messages)
 
     else:
         return render_template('home-anon.html')
