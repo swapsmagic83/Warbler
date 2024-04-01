@@ -15,7 +15,7 @@ from models import db, User, Message, Follows
 # before we import our app, since that will have already
 # connected to the database
 
-os.environ['DATABASE_URL'] = "postgresql:///warbler-test"
+os.environ['DATABASE_URL'] = "postgresql:///warbler_test"
 
 
 # Now we can import app
@@ -26,6 +26,7 @@ from app import app
 # once for all tests --- in each test, we'll delete the data
 # and create fresh new clean test data
 
+db.drop_all()
 db.create_all()
 
 
@@ -51,8 +52,62 @@ class UserModelTestCase(TestCase):
         )
 
         db.session.add(u)
-        db.session.commit()
 
         # User should have no messages & no followers
         self.assertEqual(len(u.messages), 0)
         self.assertEqual(len(u.followers), 0)
+
+        db.session.rollback()
+
+    def test_user_repr(self):
+        u = User(
+            email="test@test.com",
+            username="testuser",
+            password="HASHED_PASSWORD"
+        )
+
+        self.assertEqual(u.__repr__(), '<User #None: testuser, test@test.com>')
+
+    def test_user_following(self):
+
+        u1 = User(
+            email="test1@test.com",
+            username="testuser1",
+            password="HASHED_PASSWORD"
+        )
+
+        u2 = User(
+            email="test2@test.com",
+            username="testuse2",
+            password="HASHED_PASSWORD"
+        )
+
+        db.session.add(u1)
+        db.session.add(u2)
+        db.session.commit()
+
+        # u1 is not following u2
+        self.assertFalse(u1.is_following(u2))
+        self.assertFalse(u2.is_followed_by(u1))
+
+        #u1 is following u2
+        u2.followers.append(u1)
+        db.session.commit()
+
+        #u2 is followed by u1
+        self.assertTrue(u2.is_followed_by(u1))
+        self.assertTrue(u1.is_following(u2))
+
+    def test_user_signup(self):
+        user1 = User.signup(
+                username="test1",
+                password="HASHED_PASSWORD",
+                email="test1@test.com",
+                image_url="http://test.url"
+            )
+        u1 = User.query.filter_by(username="test1").first()
+        self.assertEqual(u1.id, user1.id)
+
+    def test_user_authenticate(self):
+        is_auth = User.authenticate(username='randomUser', password="randomPassword")
+        self.assertFalse(is_auth)
